@@ -1,0 +1,6 @@
+{
+  "extends": ["@rc-foundation/eslint-config-rc"],
+  "rules": {
+    "import/no-cycle": "off"
+  }
+}
