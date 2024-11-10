@@ -8,7 +8,6 @@ import {
     Vector2,
     Vector3,
 } from 'three';
-import { Enemies } from '../Enemies/Enemies';
 import { Consumable } from './Consumable/Consumable.ts';
 import { Hero } from '../Hero/Hero';
 import { Medkit } from './Medkit/Medkit.ts';
@@ -147,7 +146,5 @@ export class Terrain {
         this.consumable.dispose();
         this.tree.dispose();
         this.medkit.dispose();
-
-        Enemies.dispose();
     }
 }
