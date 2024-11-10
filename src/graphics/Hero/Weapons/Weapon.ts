@@ -1,11 +1,10 @@
-import { CircleGeometry, CylinderGeometry, DoubleSide, Mesh, ShaderMaterial } from 'three';
+import { DoubleSide, Mesh, ShaderMaterial, TorusGeometry } from 'three';
 
 import fireVertShader from './FireZone/mat.vert.glsl?raw';
 import fireFragShader from './FireZone/mat.frag.glsl?raw';
 
 import electricVertShader from './ElectricZone/mat.vert.glsl?raw';
 import electricFragShader from './ElectricZone/mat.frag.glsl?raw';
-import { Enemies } from '../../Enemies/Enemies.ts';
 
 export enum WeaponType {
     FireZone,
@@ -57,24 +56,10 @@ export class Weapon {
             side: DoubleSide,
         });
 
-        if (isFireZone) {
-            const geo = new CircleGeometry(this.stats.radius, 64);
-            this.mesh = new Mesh(geo, this.material);
-            this.mesh.rotation.x = -Math.PI / 2;
-            this.mesh.position.y = -0.5;
-        } else {
-            const geo = new CylinderGeometry(
-                this.stats.radius * 1.25,
-                this.stats.radius,
-                4,
-                64,
-                8,
-                true,
-            );
-            this.mesh = new Mesh(geo, this.material);
-            this.mesh.rotation.y = this.stats.radius / 2;
-            this.mesh.position.z = -this.stats.radius / 2;
-        }
+        const geo = new TorusGeometry(this.stats.radius, 1, 8);
+        this.mesh = new Mesh(geo, this.material);
+        this.mesh.rotation.x = -Math.PI / 2;
+        this.mesh.position.y = -0.5;
     }
 
     public setActive() {
@@ -88,17 +73,6 @@ export class Weapon {
     public updateWeapon(delta: number) {
         this.time += delta * this.stats.timeScale;
         this.material.uniforms.time.value = this.time;
-
-        const enemies = Enemies.getEnemies();
-        const damageRadius =
-            this.type === WeaponType.FireZone ? this.stats.radius : this.stats.radius * 1.5;
-
-        for (const enemy of enemies) {
-            const { mesh } = enemy;
-            if (this.hero.position.distanceTo(mesh.position) < damageRadius) {
-                enemy.hp -= this.stats.damage;
-            }
-        }
     }
 
     /*

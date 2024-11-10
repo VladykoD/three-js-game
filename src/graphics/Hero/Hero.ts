@@ -2,6 +2,7 @@ import { AnimationAction, AnimationMixer, Mesh, Object3D, PointLight, Scene, Vec
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Weapon, WeaponType } from './Weapons/Weapon.ts';
 import { Controls } from './Controls/Controls.ts';
+import { Enemies } from '../Enemies/Enemies.ts';
 
 export interface HeroStats {
     hp: number;
@@ -208,9 +209,23 @@ export class Hero {
 
         for (const weapon of this.weapons) {
             weapon.updateWeapon(delta);
+            this.handleWeaponDamage(weapon);
         }
         if (this.stats.hp <= 0) {
             this.die();
+        }
+    }
+
+    private handleWeaponDamage(weapon: Weapon) {
+        const stats = weapon.getStats();
+        const damageRadius = stats.radius * 1.5;
+        const enemies = Enemies.getEnemies();
+
+        for (const enemy of enemies) {
+            const { mesh } = enemy;
+            if (this.heroGroup.position.distanceTo(mesh.position) < damageRadius) {
+                enemy.hp -= stats.damage;
+            }
         }
     }
 
