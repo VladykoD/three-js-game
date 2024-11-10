@@ -1,5 +1,5 @@
 import { DodecahedronGeometry, Mesh, MeshStandardMaterial, Scene, Vector3 } from 'three';
-import { SECTOR_SIZE, SectorProps } from '../../Terrain/Terrain.ts';
+import { SECTOR_SIZE, SectorProps } from '../Terrain.ts';
 import { Hero } from '../../Hero/Hero.ts';
 
 export enum ConsumableItems {
@@ -16,6 +16,7 @@ export enum Exp {
 interface ExpSphere {
     mesh: Mesh;
     collected: boolean;
+    sector: SectorProps;
 }
 
 const CONSUMABLE_SIZE = 0.3;
@@ -26,7 +27,7 @@ export class Consumable {
 
     private readonly expLimitBySector: [number, number] = [1, 3];
 
-    private readonly expSpheres: ExpSphere[] = [];
+    private expSpheres: ExpSphere[] = [];
 
     private readonly hero: Hero;
 
@@ -45,13 +46,13 @@ export class Consumable {
         });
     }
 
-    private createExpSphere(position: Vector3): ExpSphere {
+    private createExpSphere(position: Vector3, sector: SectorProps): ExpSphere {
         const mesh = new Mesh(this.expGeometry, this.expMaterial);
         mesh.scale.setScalar(CONSUMABLE_SIZE);
         mesh.position.copy(position);
         this.scene.add(mesh);
 
-        return { mesh, collected: false };
+        return { mesh, collected: false, sector };
     }
 
     private getRandomSectorPosition(sector: SectorProps): Vector3 {
@@ -71,13 +72,17 @@ export class Consumable {
         const amount = this.getRandomAmount();
         for (let i = 0; i < amount; i++) {
             const position = this.getRandomSectorPosition(sector);
-            const expSphere = this.createExpSphere(position);
+            const expSphere = this.createExpSphere(position, sector);
             this.expSpheres.push(expSphere);
         }
     }
 
     public dropExpSphere(pos: Vector3) {
-        const expSphere = this.createExpSphere(pos);
+        const sector: SectorProps = {
+            x: Math.floor(pos.x / SECTOR_SIZE) * SECTOR_SIZE,
+            y: Math.floor(pos.z / SECTOR_SIZE) * SECTOR_SIZE,
+        };
+        const expSphere = this.createExpSphere(pos, sector);
         this.expSpheres.push(expSphere);
     }
 
@@ -93,6 +98,18 @@ export class Consumable {
                 this.pickExp(idx);
             }
         }
+    }
+
+    public removeExpSpheresInSector(sector: SectorProps) {
+        this.expSpheres = this.expSpheres.filter((expSphere) => {
+            if (expSphere.sector.x === sector.x && expSphere.sector.y === sector.y) {
+                this.scene.remove(expSphere.mesh);
+
+                return false;
+            }
+
+            return true;
+        });
     }
 
     public dispose() {

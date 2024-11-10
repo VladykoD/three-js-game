@@ -3,7 +3,7 @@ import { Enemies } from '../Enemies/Enemies.ts';
 import { Terrain } from '../Terrain/Terrain.ts';
 import { FrameHandler } from '../../helpers/FrameHandler.ts';
 import { Timer } from './Timer/Timer.ts';
-import { Consumable } from '../Combat/Consumable/Consumable.ts';
+import { Consumable } from '../Terrain/Consumable/Consumable.ts';
 import { Medkit } from '../Terrain/Medkit/Medkit.ts';
 import { Hero } from '../Hero/Hero.ts';
 

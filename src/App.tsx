@@ -17,6 +17,16 @@ function App() {
         }
     }, []);
 
+    const handleSpaceKeyPress = useCallback(
+        (event: KeyboardEvent) => {
+            if (event.code === 'Space' && !isGameStarted) {
+                event.preventDefault(); // Prevent default space bar behavior
+                handleStartGame();
+            }
+        },
+        [isGameStarted],
+    );
+
     const togglePause = () => {
         if (scene.current) {
             scene.current.togglePause();
@@ -46,13 +56,15 @@ function App() {
             scene.current = new Main(canvas, timeEL, setHeroHp);
 
             window.addEventListener('keydown', handleEscapeKeyPress);
+            window.addEventListener('keydown', handleSpaceKeyPress);
 
             return () => {
                 scene.current?.dispose();
                 window.removeEventListener('keydown', handleEscapeKeyPress);
+                window.removeEventListener('keydown', handleSpaceKeyPress);
             };
         }
-    }, [handleEscapeKeyPress]);
+    }, [handleEscapeKeyPress, handleSpaceKeyPress]);
 
     const handleStartGame = () => {
         setIsGameStarted(true);

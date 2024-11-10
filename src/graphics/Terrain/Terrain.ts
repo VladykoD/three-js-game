@@ -1,20 +1,18 @@
 import {
-    Group,
     Material,
     Mesh,
     MeshBasicMaterial,
     MeshStandardMaterial,
-    Object3DEventMap,
     PlaneGeometry,
     Scene,
     Vector2,
     Vector3,
 } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Enemies } from '../Enemies/Enemies';
-import { Consumable } from '../Combat/Consumable/Consumable.ts';
+import { Consumable } from './Consumable/Consumable.ts';
 import { Hero } from '../Hero/Hero';
 import { Medkit } from './Medkit/Medkit.ts';
+import { Tree } from './Threes/Tree.ts';
 
 export interface SectorProps {
     x: number;
@@ -31,20 +29,20 @@ export class Terrain {
 
     private readonly curSector: Vector2 = new Vector2(0, 0);
 
+    private readonly sectorMeshes: Map<string, Mesh[]> = new Map();
+
     private readonly consumable: Consumable;
 
     private readonly medkit: Medkit;
 
-    private readonly sectorMeshes: Map<string, Mesh[]> = new Map();
-
-    private treeModel: Group<Object3DEventMap> | null = null;
+    private readonly tree: Tree;
 
     public constructor(scene: Scene, hero: Hero) {
         this.scene = scene;
         this.consumable = new Consumable(scene, hero);
         this.medkit = new Medkit(scene, hero);
+        this.tree = new Tree(scene);
         this.generateSector(0, 0);
-        this.loadTreeModel();
     }
 
     private getSectorKey(x: number, y: number): string {
@@ -111,10 +109,8 @@ export class Terrain {
 
         this.consumable.generateExperience({ x, y });
         this.medkit.generateMedkits({ x, y });
-
-        if (this.treeModel) {
-            this.addTreesToSector(x, y);
-        }
+        this.tree.generateTrees({ x, y });
+        this.consumable.removeExpSpheresInSector({ x, y });
     }
 
     private disposeSector(key: string) {
@@ -130,6 +126,11 @@ export class Terrain {
             this.sectorMeshes.delete(key);
         }
         this.sectors.delete(key);
+
+        // Удаление деревьев для данного сектора
+        const [x, y] = key.split(',').map(Number);
+        this.tree.removeTreesInSector({ x, y });
+        this.medkit.removeMedkitsInSector({ x, y });
     }
 
     public update(_delta: number, hero: Hero) {
@@ -144,38 +145,9 @@ export class Terrain {
         }
 
         this.consumable.dispose();
+        this.tree.dispose();
         this.medkit.dispose();
 
         Enemies.dispose();
-    }
-
-    private loadTreeModel() {
-        const loader = new GLTFLoader();
-        loader.load('src/models/mushroom_min.glb', (gltf) => {
-            const model = gltf.scene;
-            model.traverse((object) => {
-                if (object) {
-                    object.castShadow = true;
-                    object.receiveShadow = true;
-                    object.scale.setScalar(1.2);
-                }
-            });
-            this.treeModel = model;
-        });
-    }
-
-    private addTreesToSector(x: number, y: number) {
-        const numTrees = 10;
-        const territorySize = SECTOR_SIZE;
-
-        for (let i = 0; i < numTrees; i++) {
-            const clone = this.treeModel?.clone();
-            if (clone) {
-                const offsetX = (Math.random() - 0.5) * territorySize;
-                const offsetZ = (Math.random() - 0.5) * territorySize;
-                clone.position.set(x + offsetX, 0, y + offsetZ);
-                this.scene.add(clone);
-            }
-        }
     }
 }

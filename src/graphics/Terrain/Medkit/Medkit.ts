@@ -11,7 +11,9 @@ interface MedkitItem {
 export class Medkit {
     private readonly scene: Scene;
 
-    private readonly medkits: MedkitItem[] = [];
+    private medkits: MedkitItem[] = [];
+
+    private readonly medkitSectors: Map<string, SectorProps> = new Map();
 
     private readonly hero: Hero;
 
@@ -24,7 +26,7 @@ export class Medkit {
 
         const loader = new GLTFLoader();
         loader.load(
-            'src/models/health_kit.glb',
+            'src/models/medkit_new.glb',
             (gltf) => {
                 const model = gltf.scene;
                 model.traverse((object: any) => {
@@ -49,17 +51,21 @@ export class Medkit {
             return;
         }
 
-        const [minLimit, maxLimit] = [2, 10]; // Пример лимитов для генерации аптечек
+        const [minLimit, maxLimit] = [0, 2]; // Пример лимитов для генерации аптечек
         const amount = minLimit + Math.random() * (maxLimit - minLimit);
 
         for (let i = 0; i < amount; i++) {
             const x = sector.x + Math.random() * SECTOR_SIZE - SECTOR_SIZE * 0.5;
             const y = sector.y + Math.random() * SECTOR_SIZE - SECTOR_SIZE * 0.5;
             const mesh = this.medkitGeometry.clone();
-            mesh.scale.setScalar(0.55);
-            mesh.position.set(x, 0, y);
+            mesh.scale.setScalar(0.05);
+            mesh.rotation.set(Math.PI / 2, 0, 0);
+            mesh.position.set(x, 0.2, y);
             this.scene.add(mesh);
-            this.medkits.push({ mesh, collected: false });
+            const medkit = { mesh, collected: false };
+            this.medkits.push(medkit);
+
+            this.medkitSectors.set(medkit.mesh.uuid, sector);
         }
     }
 
@@ -88,10 +94,24 @@ export class Medkit {
 
     public checkPickUp(pos: Vector3) {
         for (const [idx, medkit] of this.medkits.entries()) {
-            if (!medkit.collected && medkit.mesh.position.distanceTo(pos) < 1) {
+            if (!medkit.collected && medkit.mesh.position.distanceTo(pos) < 2) {
                 this.pickMedkit(idx);
             }
         }
+    }
+
+    public removeMedkitsInSector(sector: SectorProps) {
+        this.medkits = this.medkits.filter((medkit) => {
+            const medkitSector = this.medkitSectors.get(medkit.mesh.uuid);
+            if (medkitSector && medkitSector.x === sector.x && medkitSector.y === sector.y) {
+                this.scene.remove(medkit.mesh);
+                this.medkitSectors.delete(medkit.mesh.uuid);
+
+                return false;
+            }
+
+            return true;
+        });
     }
 
     public dispose() {
