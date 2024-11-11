@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import css from './App.module.scss';
 import { Main } from './graphics/Main';
+import loadingScreen from '../static/images/loading-screen.webp';
 
 function App() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -90,11 +91,14 @@ function App() {
                 )}
             </div>
             <canvas ref={canvasRef} />
-            <div className={clsx(css.overlay, isGameStarted ? css.hideOverlay : '')} />
+            <div className={clsx(css.overlay, isGameStarted ? css.hideOverlay : '')}>
+                <img src={loadingScreen} alt="" />
+                <div className="loadingBar" />
+            </div>
             {!isGameStarted && (
                 <div className={clsx(css.loading, isGameStarted ? css.hideLoading : '')}>
                     <h1>
-                        Loading Experience... <span id="progressPercentage" />%
+                        Лес загружается... <span id="progressPercentage" />%
                     </h1>
                     <button className={css.start} onClick={handleStartGame}>
                         START

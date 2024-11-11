@@ -5,6 +5,7 @@ import {
     MeshStandardMaterial,
     PlaneGeometry,
     Scene,
+    TextureLoader,
     Vector2,
     Vector3,
 } from 'three';
@@ -36,12 +37,18 @@ export class Terrain {
 
     private readonly tree: Tree;
 
+    private ambienceSound: HTMLAudioElement | null = null;
+
+    private userInteracted: boolean = false;
+
     public constructor(scene: Scene, hero: Hero) {
         this.scene = scene;
         this.consumable = new Consumable(scene, hero);
         this.medkit = new Medkit(scene, hero);
         this.tree = new Tree(scene);
         this.generateSector(0, 0);
+        this.loadTreeModel();
+        this.setAmbienceSound();
     }
 
     private getSectorKey(x: number, y: number): string {
@@ -94,7 +101,11 @@ export class Terrain {
         );
         const sectorShadow = new Mesh(
             new PlaneGeometry(SECTOR_SIZE, SECTOR_SIZE),
-            new MeshStandardMaterial({ color: '#493636', depthWrite: false }),
+            new MeshStandardMaterial({
+                map: new TextureLoader().load('../../../static/textures/color.jpg'),
+                normalMap: new TextureLoader().load('../../../static/textures/normal.jpg'),
+                // depthWrite: false,
+            }),
         );
         sector.receiveShadow = true;
         sectorShadow.receiveShadow = true;
@@ -146,5 +157,23 @@ export class Terrain {
         this.consumable.dispose();
         this.tree.dispose();
         this.medkit.dispose();
+    }
+
+    public setAmbienceSound() {
+        this.ambienceSound = new Audio('../../../static/sounds/ambient-sound.mp3');
+        this.ambienceSound.volume = 0.2;
+        this.ambienceSound.loop = true;
+
+        this.userInteracted = false;
+
+        const playAmbienceSound = () => {
+            if (!this.userInteracted) {
+                this.userInteracted = true;
+                this.ambienceSound!.play();
+            }
+        };
+
+        document.addEventListener('click', playAmbienceSound, { once: true });
+        document.addEventListener('keydown', playAmbienceSound, { once: true });
     }
 }
