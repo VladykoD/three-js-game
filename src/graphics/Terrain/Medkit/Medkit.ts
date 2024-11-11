@@ -6,24 +6,36 @@ import { SECTOR_SIZE, SectorProps } from '../Terrain.ts';
 interface MedkitItem {
     mesh: Object3D;
     collected: boolean;
+    instanceId?: number;
 }
+
+const MEDKIT_POOL_SIZE = 30;
+const MEDKIT_GENERATION_LIMITS = [0, 2];
 
 export class Medkit {
     private readonly scene: Scene;
 
-    private medkits: MedkitItem[] = [];
+    private readonly medkits: MedkitItem[] = [];
+
+    private readonly medkitPool: MedkitItem[] = [];
 
     private readonly medkitSectors: Map<string, SectorProps> = new Map();
 
     private readonly hero: Hero;
 
-    private medkitGeometry: Object3D;
+    private medkitGeometry: Object3D | null = null;
+
+    private nextInstanceId = 0;
 
     public constructor(scene: Scene, hero: Hero) {
         this.scene = scene;
         this.hero = hero;
-        this.medkitGeometry = new Object3D();
 
+        this.initPool();
+        this.loadMedkitModel();
+    }
+
+    private loadMedkitModel() {
         const loader = new GLTFLoader();
         loader.load(
             'src/models/medkit_new.glb',
@@ -44,6 +56,36 @@ export class Medkit {
         );
     }
 
+    private initPool() {
+        for (let i = 0; i < MEDKIT_POOL_SIZE; i++) {
+            const mesh = new Object3D();
+
+            this.medkitPool.push({
+                mesh,
+                collected: false,
+                instanceId: this.nextInstanceId++,
+            });
+        }
+    }
+
+    private getMedkitFromPool(): MedkitItem | null {
+        const medkit = this.medkitPool.find((m) => !m.mesh.parent);
+
+        if (medkit) {
+            const newMedkit = {
+                ...medkit,
+                mesh: medkit.mesh.clone(),
+                instanceId: this.nextInstanceId++,
+                collected: false,
+            };
+            this.medkits.push(newMedkit);
+
+            return newMedkit;
+        }
+
+        return null;
+    }
+
     public generateMedkits(sector: SectorProps) {
         if (!this.medkitGeometry) {
             console.warn('Medkit model is not loaded yet.');
@@ -51,10 +93,15 @@ export class Medkit {
             return;
         }
 
-        const [minLimit, maxLimit] = [0, 2]; // Пример лимитов для генерации аптечек
+        const [minLimit, maxLimit] = MEDKIT_GENERATION_LIMITS;
         const amount = minLimit + Math.random() * (maxLimit - minLimit);
 
         for (let i = 0; i < amount; i++) {
+            const medkit = this.getMedkitFromPool();
+            if (!medkit) {
+                break;
+            }
+
             const x = sector.x + Math.random() * SECTOR_SIZE - SECTOR_SIZE * 0.5;
             const y = sector.y + Math.random() * SECTOR_SIZE - SECTOR_SIZE * 0.5;
             const mesh = this.medkitGeometry.clone();
@@ -62,9 +109,8 @@ export class Medkit {
             mesh.rotation.set(Math.PI / 2, 0, 0);
             mesh.position.set(x, 0.2, y);
             this.scene.add(mesh);
-            const medkit = { mesh, collected: false };
-            this.medkits.push(medkit);
 
+            medkit.mesh = mesh;
             this.medkitSectors.set(medkit.mesh.uuid, sector);
         }
     }
@@ -76,11 +122,17 @@ export class Medkit {
             return;
         }
 
+        const medkit = this.getMedkitFromPool();
+        if (!medkit) {
+            return;
+        }
+
         const mesh = this.medkitGeometry.clone();
         mesh.scale.setScalar(0.15);
         mesh.position.copy(pos);
         this.scene.add(mesh);
-        this.medkits.push({ mesh, collected: false });
+
+        medkit.mesh = mesh;
     }
 
     private pickMedkit(idx: number) {
@@ -89,7 +141,8 @@ export class Medkit {
         }
         this.hero.addHp(20);
         this.scene.remove(this.medkits[idx].mesh);
-        this.medkits[idx].collected = true;
+        this.medkitPool.push(this.medkits[idx]);
+        this.medkits.slice(idx, 1);
     }
 
     public checkPickUp(pos: Vector3) {
@@ -101,16 +154,14 @@ export class Medkit {
     }
 
     public removeMedkitsInSector(sector: SectorProps) {
-        this.medkits = this.medkits.filter((medkit) => {
+        this.medkits.forEach((medkit, idx) => {
             const medkitSector = this.medkitSectors.get(medkit.mesh.uuid);
             if (medkitSector && medkitSector.x === sector.x && medkitSector.y === sector.y) {
                 this.scene.remove(medkit.mesh);
                 this.medkitSectors.delete(medkit.mesh.uuid);
-
-                return false;
+                this.medkitPool.push(medkit);
+                this.medkits.splice(idx, 1);
             }
-
-            return true;
         });
     }
 
@@ -120,5 +171,7 @@ export class Medkit {
         }
 
         this.medkits.length = 0;
+        this.medkitPool.length = 0;
+        this.nextInstanceId = 0;
     }
 }

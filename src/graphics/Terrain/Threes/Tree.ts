@@ -6,20 +6,61 @@ import { clamp } from '../../../helpers/MathUtils.ts';
 interface TreeItem {
     mesh: Object3D;
     sector: SectorProps;
+    instanceId?: number;
 }
+
+const TREE_POOL_SIZE = 50;
+const TREE_STATS = {
+    minScale: 0.6,
+    maxScale: 1.4,
+};
 
 export class Tree {
     private readonly scene: Scene;
 
     private treeModel: Group<Object3DEventMap> | null = null;
 
-    private trees: TreeItem[] = [];
+    private readonly trees: TreeItem[] = [];
+
+    private readonly treePool: TreeItem[] = [];
 
     private pendingSectors: SectorProps[] = [];
 
+    private nextInstanceId = 0;
+
     public constructor(scene: Scene) {
         this.scene = scene;
+        this.initPool();
         this.loadTreeModel();
+    }
+
+    // Создание пустых объектов для быстрого последующего использования
+    private initPool() {
+        for (let i = 0; i < TREE_POOL_SIZE; i++) {
+            const mesh = new Object3D();
+            this.treePool.push({
+                mesh,
+                sector: { x: 0, y: 0 },
+                instanceId: this.nextInstanceId++,
+            });
+        }
+    }
+
+    // Находит неиспользуемый объект в пуле и использует его
+    private getTreeFromPool(): TreeItem | null {
+        const tree = this.treePool.find((t) => !t.mesh.parent);
+        if (tree) {
+            const newTree = {
+                ...tree,
+                mesh: tree.mesh.clone(),
+                instanceId: this.nextInstanceId++,
+            };
+            this.trees.push(newTree);
+
+            return newTree;
+        }
+
+        return null;
     }
 
     private loadTreeModel() {
@@ -30,7 +71,6 @@ export class Tree {
                 if (object) {
                     object.castShadow = true;
                     object.receiveShadow = true;
-                    object.scale.setScalar(1.2);
                 }
             });
             this.treeModel = model;
@@ -57,27 +97,38 @@ export class Tree {
         const numTrees = 6;
 
         for (let i = 0; i < numTrees; i++) {
+            const tree = this.getTreeFromPool();
+            if (!tree) {
+                break;
+            }
+
             const x = sector.x + (Math.random() - 0.5) * SECTOR_SIZE;
             const y = sector.y + (Math.random() - 0.5) * SECTOR_SIZE;
-            const mesh = this.treeModel.clone();
-            mesh.position.set(x, 0, y);
-            this.scene.add(mesh);
 
-            const randomHeight = clamp(Math.random() * 0.5 + 0.7, 0.5, 1.2);
-            mesh.scale.setScalar(randomHeight);
-            this.trees.push({ mesh, sector });
+            const clonedModel = this.treeModel.clone();
+            clonedModel.position.set(x, 0, y);
+            this.scene.add(clonedModel);
+
+            tree.mesh = clonedModel;
+            tree.sector = sector;
+
+            const randomHeight = clamp(
+                Math.random() * TREE_STATS.maxScale + TREE_STATS.minScale,
+                TREE_STATS.minScale,
+                TREE_STATS.maxScale,
+            );
+            tree.mesh.scale.setScalar(randomHeight);
         }
     }
 
     public removeTreesInSector(sector: SectorProps) {
-        this.trees = this.trees.filter((tree) => {
+        this.trees.forEach((tree, index) => {
             if (tree.sector.x === sector.x && tree.sector.y === sector.y) {
                 this.scene.remove(tree.mesh);
-
-                return false;
+                // возвращаем дерево в пул для переиспользования
+                this.treePool.push(tree);
+                this.trees.splice(index, 1);
             }
-
-            return true;
         });
     }
 
@@ -85,7 +136,13 @@ export class Tree {
         for (const tree of this.trees) {
             this.scene.remove(tree.mesh);
         }
-        this.trees = [];
+        this.trees.length = 0;
+        this.treePool.length = 0;
         this.pendingSectors = [];
+        this.nextInstanceId = 0;
+    }
+
+    public getTrees(): TreeItem[] {
+        return this.trees;
     }
 }
