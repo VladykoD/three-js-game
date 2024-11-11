@@ -1,4 +1,4 @@
-import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Scene } from 'three';
+import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Scene, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Hero } from '../Hero/Hero';
 import { Consumable } from '../Terrain/Consumable/Consumable.ts';
@@ -15,21 +15,25 @@ export interface Enemy {
         startTime: number;
         duration: number;
     };
+    instanceId?: number;
 }
 
 const DEATH_ANIMATION_DURATION = 200;
+const ENEMY_POOL_SIZE = 50;
 
-/*
 const ENEMY_STATS = [
-    { speed: 0.06, hp: 100, damage: 1, maxHp: 100 },
-    { speed: 0.08, hp: 150, damage: 2, maxHp: 150 },
-    { speed: 0.1, hp: 200, damage: 3, maxHp: 200 },
+    { speed: 0.06, hp: 100, damage: 1, maxHp: 100, isDying: false },
+    { speed: 0.08, hp: 150, damage: 2, maxHp: 150, isDying: false },
+    { speed: 0.1, hp: 200, damage: 3, maxHp: 200, isDying: false },
 ];
-
- */
 
 export class Enemies {
     private static readonly enemies: Enemy[] = [];
+
+    // Пул врагов для инстансинга
+    private static readonly enemyPool: Enemy[] = [];
+
+    private static nextInstanceId = 0;
 
     private static genInt: number = 0;
 
@@ -41,8 +45,6 @@ export class Enemies {
 
     private static enemyModel: Object3D | null = null;
 
-    // private static getEnemyStats(level: number): Omit<Enemy, 'mesh' | 'model'>
-
     public static init(scene: Scene, hero: Hero, consumable: Consumable) {
         if (!scene || !hero || !consumable) {
             throw new Error('Scene, Hero, and Consumable are required to initialize Enemies.');
@@ -51,7 +53,58 @@ export class Enemies {
         this.hero = hero;
         this.consumable = consumable;
 
+        this.initPool();
         this.loadModel();
+    }
+
+    // Предварительное создание врагов для быстрого инстансинга
+    public static initPool() {
+        for (let i = 0; i < ENEMY_POOL_SIZE; i++) {
+            const collisionMesh = new Mesh(
+                new BoxGeometry(0.5, 0.5, 0.5),
+                new MeshBasicMaterial({ visible: false }),
+            );
+
+            this.enemyPool.push({
+                mesh: collisionMesh,
+                model: null,
+                speed: 0.06,
+                hp: 100,
+                damage: 10,
+                maxHp: 100,
+                instanceId: this.nextInstanceId++,
+            });
+        }
+    }
+
+    // получение врага из пула
+    private static getEnemyFromPool(): Enemy | null {
+        const enemy = this.enemyPool.find((e) => !e.model);
+
+        if (enemy) {
+            const newEnemy = {
+                ...enemy,
+                ...ENEMY_STATS[0],
+                mesh: enemy.mesh.clone(),
+                deathAnimation: undefined,
+                isDying: false,
+            };
+
+            if (newEnemy.model) {
+                newEnemy.model.traverse((object: any) => {
+                    if (object.isMesh && object.userData.originalMaterial) {
+                        object.material = object.userData.originalMaterial;
+                        delete object.userData.originalMaterial;
+                    }
+                });
+            }
+
+            this.enemies.push(newEnemy);
+
+            return newEnemy;
+        }
+
+        return null;
     }
 
     public static loadModel() {
@@ -70,49 +123,34 @@ export class Enemies {
     }
 
     private static generateEnemy() {
+        const enemy = this.getEnemyFromPool();
+        if (!enemy) {
+            return;
+        }
+
         const dist = 9 + Math.random() * 4;
         const angle = Math.random() * Math.PI * 2;
-        const heroPos = this.hero.getPosition();
+
+        let heroPos: Vector3;
+        try {
+            heroPos = this.hero.getPosition ? this.hero.getPosition() : new Vector3(0, 0, 0);
+        } catch (error) {
+            console.error('Error getting hero position:', error);
+            heroPos = new Vector3(0, 0, 0);
+        }
+
         const x = Math.sin(angle) * dist + heroPos.x;
         const z = Math.cos(angle) * dist + heroPos.z;
 
-        const collisionMesh = new Mesh(
-            new BoxGeometry(0.5, 0.5, 0.5),
-            new MeshBasicMaterial({ visible: false }),
-        );
+        enemy.mesh.position.set(x, 0, z);
 
-        let enemyModel: Object3D | null = null;
         if (this.enemyModel) {
-            enemyModel = this.enemyModel.clone();
-            enemyModel.traverse((object: any) => {
-                if (object.isMesh) {
-                    object.material = object.material.clone();
-                    object.material.transparent = false;
-                    object.material.opacity = 1;
-                    object.material.color.setRGB(1, 1, 1);
-                }
-            });
-
-            enemyModel.position.set(x, 0, z);
-            enemyModel.position.y = 0.25;
-            this.scene.add(enemyModel);
+            enemy.model = this.enemyModel.clone();
+            enemy.model.position.copy(enemy.mesh.position);
+            this.scene.add(enemy.model);
         }
 
-        collisionMesh.position.set(x, 0, z);
-        this.scene.add(collisionMesh);
-
-        const stats: Omit<Enemy, 'mesh' | 'model'> = {
-            speed: 0.06,
-            hp: 100,
-            damage: 10,
-            maxHp: 100,
-        };
-
-        this.enemies.push({
-            mesh: collisionMesh,
-            model: enemyModel,
-            ...stats,
-        });
+        this.scene.add(enemy.mesh);
     }
 
     private static startDeathAnimation(enemy: Enemy) {
@@ -125,10 +163,14 @@ export class Enemies {
         if (enemy.model) {
             enemy.model.traverse((object: any) => {
                 if (object.isMesh) {
-                    const { material } = object;
-                    material.transparent = true;
-                    material.opacity = 0.5;
-                    material.color.setRGB(1, 0, 0);
+                    const originalMaterial = object.material;
+                    const deathMaterial = originalMaterial.clone();
+                    deathMaterial.transparent = true;
+                    deathMaterial.opacity = 0.5;
+                    deathMaterial.color.setRGB(1, 0, 0);
+
+                    object.userData.originalMaterial = originalMaterial;
+                    object.material = deathMaterial;
                 }
             });
         }
@@ -212,6 +254,9 @@ export class Enemies {
             }
         });
         this.enemies.length = 0;
+        this.enemyPool.length = 0;
+        this.enemyModel = null;
+        this.nextInstanceId = 0;
     }
 
     public static setSpawnRate(spawnRate: number) {
