@@ -1,8 +1,8 @@
 import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Scene } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Hero } from '../Hero/Hero';
-import { Consumable } from '../Combat/Consumable/Consumable.ts';
-import { Medkit } from '../Terrain/Medkit/Medkit.ts';
+import { Consumable } from '../Consumable/Consumable.ts';
+import { Medkit } from '../Medkit/Medkit.ts';
 
 export interface Enemy {
     mesh: Object3D;
@@ -53,7 +53,7 @@ export class Enemies {
         this.consumable = consumable;
 
         const loader = new GLTFLoader();
-        loader.load('src/models/alien_flying_min.glb', (gltf) => {
+        loader.load('src/models/alien.glb', (gltf) => {
             const model = gltf.scene;
             model.traverse((object: any) => {
                 if (object.isMesh) {
@@ -61,7 +61,7 @@ export class Enemies {
                     object.receiveShadow = true;
                 }
             });
-            model.scale.setScalar(10);
+            model.scale.setScalar(0.7);
             this.enemyModel = model;
         });
     }
@@ -101,7 +101,7 @@ export class Enemies {
         const stats: Omit<Enemy, 'mesh' | 'model'> = {
             speed: 0.06,
             hp: 100,
-            damage: 10,
+            damage: 1,
             maxHp: 100,
         };
 
@@ -196,7 +196,7 @@ export class Enemies {
             if (hp < 0) {
                 this.killEnemy(i);
             } else if (mesh.position.distanceTo(heroPos) < 0.5) {
-                this.hero.getDamage(damage);
+                Hero.getDamage(damage);
             }
         }
     }
