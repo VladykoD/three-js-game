@@ -2,7 +2,6 @@ import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Scene } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Hero } from '../Hero/Hero';
 import { Consumable } from '../Terrain/Consumable/Consumable.ts';
-import { Medkit } from '../Terrain/Medkit/Medkit.ts';
 
 export interface Enemy {
     mesh: Object3D;
@@ -44,14 +43,18 @@ export class Enemies {
 
     // private static getEnemyStats(level: number): Omit<Enemy, 'mesh' | 'model'>
 
-    public static init(scene: Scene, hero: Hero, consumable: Consumable, medkit: Medkit) {
-        if (!scene || !hero || !consumable || !medkit) {
+    public static init(scene: Scene, hero: Hero, consumable: Consumable) {
+        if (!scene || !hero || !consumable) {
             throw new Error('Scene, Hero, and Consumable are required to initialize Enemies.');
         }
         this.scene = scene;
         this.hero = hero;
         this.consumable = consumable;
 
+        this.loadModel();
+    }
+
+    public static loadModel() {
         const loader = new GLTFLoader();
         loader.load('src/models/alien_flying_min.glb', (gltf) => {
             const model = gltf.scene;
