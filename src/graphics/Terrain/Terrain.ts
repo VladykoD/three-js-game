@@ -47,7 +47,6 @@ export class Terrain {
         this.medkit = new Medkit(scene, hero);
         this.tree = new Tree(scene);
         this.generateSector(0, 0);
-        this.loadTreeModel();
         this.setAmbienceSound();
     }
 
