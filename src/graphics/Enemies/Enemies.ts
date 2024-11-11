@@ -146,7 +146,6 @@ export class Enemies {
             return true;
         }
 
-        // Плавное опускание вниз
         if (enemy.model) {
             enemy.model.position.y = 0.3 - progress;
         }

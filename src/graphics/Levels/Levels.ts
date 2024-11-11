@@ -66,7 +66,7 @@ export class Levels {
     }
 
     private initializeEnemies() {
-        Enemies.init(this.scene, this.hero, this.consumable, this.medkit);
+        Enemies.init(this.scene, this.hero, this.consumable);
         Enemies.setSpawnRate(1000);
     }
 
